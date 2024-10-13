@@ -1,4 +1,6 @@
 import os
+import sys
+import aria2p
 from .transcribe import Transcribe, TranscriptionOptions
 from .languages import from_language_to_iso_code
 import numpy as np
@@ -6,11 +8,16 @@ import warnings
 from typing import Union, List
 from .writers import get_writer
 from .live import Live
-import sys
 import datetime
 from .commandline import CommandLine
 import traceback
 
+def is_aria2_available():
+    try:
+        import aria2p
+        return True
+    except ImportError:
+        return False
 
 def get_diarization(audio, diarize_model, verbose):
     diarization_output = {}
@@ -26,7 +33,6 @@ def get_diarization(audio, diarize_model, verbose):
 
     diarize_model.unload_model()
     return diarization_output
-
 
 def get_transcription_options(args):
     temperature = args.pop("temperature")
@@ -71,7 +77,6 @@ def get_transcription_options(args):
         vad_min_silence_duration_ms=args.pop("vad_min_silence_duration_ms"),
     )
 
-
 def get_language(language, model_directory, model):
     language = from_language_to_iso_code(language)
 
@@ -87,7 +92,6 @@ def get_language(language, model_directory, model):
         language = "en"
 
     return language
-
 
 def main():
     args = CommandLine().read_command_line()
@@ -204,6 +208,14 @@ def main():
 
         return
 
+    if is_aria2_available():
+        aria2 = aria2p.API(aria2p.Client(host="http://localhost", port=6800, secret=""))
+        download = aria2.add_uris([model], {"dir": cache_directory})
+        aria2.wait_for_downloads()
+    else:
+        # Fallback to existing method
+        # Download model using existing method
+
     transcribe = Transcribe(
         model_dir,
         device,
@@ -217,7 +229,6 @@ def main():
     diarization = len(hf_token) > 0
 
     if diarization:
-        # Import is done here then dependencies like torch are only imported if we really need diarization
         from .diarization import Diarization
 
         diarization_device = "cpu" if device == "auto" else device
@@ -229,8 +240,6 @@ def main():
     if diarization:
         diarization_output = get_diarization(audio, diarize_model, verbose)
 
-    # We need to do first the diarization of all files because CTranslate2 and torch
-    # use incompatible CUDA versions and once CTranslate2 is used torch will not work
     for audio_path in audio:
         try:
             if verbose and len(audio) > 1:
@@ -270,7 +279,6 @@ def main():
 
     if verbose:
         print(f"Transcription results written to '{output_dir}' directory")
-
 
 if __name__ == "__main__":
     main()
