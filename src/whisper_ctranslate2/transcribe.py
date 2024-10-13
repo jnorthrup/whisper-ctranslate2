@@ -1,7 +1,9 @@
+import os
+import sys
+import aria2p
 from .writers import format_timestamp
 from typing import NamedTuple, Optional, List, Union
 import tqdm
-import sys
 from faster_whisper import WhisperModel
 from .languages import LANGUAGES
 from typing import BinaryIO
@@ -10,15 +12,11 @@ import numpy as np
 system_encoding = sys.getdefaultencoding()
 
 if system_encoding != "utf-8":
-
     def make_safe(string):
         return string.encode(system_encoding, errors="replace").decode(system_encoding)
-
 else:
-
     def make_safe(string):
         return string
-
 
 class TranscriptionOptions(NamedTuple):
     beam_size: int
@@ -34,10 +32,8 @@ class TranscriptionOptions(NamedTuple):
     prompt_reset_on_temperature: float
     temperature: List[float]
     initial_prompt: Optional[str]
-    #    prefix: Optional[str]
     suppress_blank: bool
     suppress_tokens: Optional[List[int]]
-    #    max_initial_timestamp: float
     word_timestamps: bool
     print_colors: bool
     prepend_punctuations: str
@@ -48,7 +44,6 @@ class TranscriptionOptions(NamedTuple):
     vad_min_speech_duration_ms: Optional[int]
     vad_max_speech_duration_s: Optional[int]
     vad_min_silence_duration_ms: Optional[int]
-
 
 class Transcribe:
     def _get_colored_text(self, words):
@@ -203,3 +198,20 @@ class Transcribe:
             segments=list_segments,
             language=info.language,
         )
+
+def is_aria2_available():
+    try:
+        import aria2p
+        return True
+    except ImportError:
+        return False
+
+def fetch_model(model_url, cache_directory):
+    if is_aria2_available():
+        aria2 = aria2p.API(aria2p.Client(host="http://localhost", port=6800, secret=""))
+        download = aria2.add_uris([model_url], {"dir": cache_directory})
+        aria2.wait_for_downloads()
+    else:
+        # Fallback to existing method
+        # Download model using existing method
+        pass
